@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, inMemoryPersistence, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -26,5 +26,10 @@ if (!firebaseReady) {
 const app = firebaseReady ? initializeApp(firebaseConfig) : null;
 
 export const auth = app ? getAuth(app) : null;
+export const authPersistenceReady = auth
+  ? setPersistence(auth, inMemoryPersistence).catch((error) => {
+      console.error("Firebase Auth persistence could not be restricted.", error);
+    })
+  : Promise.resolve();
 export const db = app ? getFirestore(app) : null;
 export const missingFirebaseKeys = requiredKeys;

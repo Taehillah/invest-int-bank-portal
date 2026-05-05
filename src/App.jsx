@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   createUserWithEmailAndPassword,
+  fetchSignInMethodsForEmail,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
@@ -16,12 +17,19 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { auth, db, firebaseReady, missingFirebaseKeys } from "./lib/firebase";
+import {
+  auth,
+  authPersistenceReady,
+  db,
+  firebaseReady,
+  missingFirebaseKeys,
+} from "./lib/firebase";
 import {
   validateLogin,
   validatePayment,
   validateRegistration,
 } from "./lib/validators";
+import { sendLoginAlert } from "./lib/loginAlerts";
 import bankLogo from "./assets/invest-int-bank-logo.svg";
 
 const registerDefaults = {
@@ -73,6 +81,14 @@ const dashboardSignals = [
   { label: "Connection", value: "Encrypted" },
 ];
 
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const IDLE_WARNING_SECONDS = 60;
+const MAX_WRONG_PASSWORD_ATTEMPTS = 3;
+const LOGIN_LOCKOUT_PREFIX = "invest-int-bank-login-lockout:";
+
+const lockedAccountMessage =
+  "This account has been locked after three incorrect password attempts. Please visit the bank physically to have your password reset.";
+
 function App() {
   const [authMode, setAuthMode] = useState("login");
   const [currentUser, setCurrentUser] = useState(null);
@@ -88,8 +104,16 @@ function App() {
   const [authMessage, setAuthMessage] = useState("");
   const [paymentMessage, setPaymentMessage] = useState("");
   const [payments, setPayments] = useState([]);
+  const [sessionWarningVisible, setSessionWarningVisible] = useState(false);
+  const [sessionWarningSeconds, setSessionWarningSeconds] = useState(
+    IDLE_WARNING_SECONDS,
+  );
+  const [idleResetKey, setIdleResetKey] = useState(0);
   const authPanelContentRef = useRef(null);
   const [authPanelHeight, setAuthPanelHeight] = useState("auto");
+  const idleTimerRef = useRef(null);
+  const warningTimerRef = useRef(null);
+  const warningVisibleRef = useRef(false);
 
   useEffect(() => {
     if (!firebaseReady || !auth) {
@@ -97,25 +121,105 @@ function App() {
       return undefined;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      try {
-        if (user) {
-          await loadPayments(user.uid);
-        } else {
-          setPayments([]);
-        }
-      } catch (error) {
-        console.error(error);
-        setPaymentMessage(
-          "Firebase is connected, but payment history could not be loaded.",
-        );
+    let unsubscribe = () => {};
+    let active = true;
+
+    authPersistenceReady.then(async () => {
+      if (!active) {
+        return;
       }
-      setLoading(false);
+
+      await signOut(auth).catch(() => {});
+
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
+        setCurrentUser(user);
+        try {
+          if (user) {
+            await loadPayments(user.uid);
+          } else {
+            setPayments([]);
+          }
+        } catch (error) {
+          console.error(error);
+          setPaymentMessage(
+            "Firebase is connected, but payment history could not be loaded.",
+          );
+        }
+        setLoading(false);
+      });
     });
 
-    return unsubscribe;
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    warningVisibleRef.current = sessionWarningVisible;
+  }, [sessionWarningVisible]);
+
+  useEffect(() => {
+    if (!currentUser || !auth) {
+      clearTimeout(idleTimerRef.current);
+      clearInterval(warningTimerRef.current);
+      setSessionWarningVisible(false);
+      setSessionWarningSeconds(IDLE_WARNING_SECONDS);
+      return undefined;
+    }
+
+    const clearIdleTimers = () => {
+      clearTimeout(idleTimerRef.current);
+      clearInterval(warningTimerRef.current);
+    };
+
+    const forceIdleLogout = async () => {
+      clearIdleTimers();
+      setSessionWarningVisible(false);
+      setSessionWarningSeconds(IDLE_WARNING_SECONDS);
+      await signOut(auth);
+      setAuthMessage("You were signed out because the session was inactive.");
+    };
+
+    const showIdleWarning = () => {
+      setSessionWarningSeconds(IDLE_WARNING_SECONDS);
+      setSessionWarningVisible(true);
+
+      warningTimerRef.current = setInterval(() => {
+        setSessionWarningSeconds((seconds) => {
+          if (seconds <= 1) {
+            forceIdleLogout();
+            return 0;
+          }
+
+          return seconds - 1;
+        });
+      }, 1000);
+    };
+
+    const resetIdleTimer = () => {
+      if (warningVisibleRef.current) {
+        return;
+      }
+
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(showIdleWarning, IDLE_TIMEOUT_MS);
+    };
+
+    const activityEvents = ["click", "keydown", "mousemove", "scroll", "touchstart"];
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetIdleTimer, { passive: true });
+    });
+
+    resetIdleTimer();
+
+    return () => {
+      clearIdleTimers();
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetIdleTimer);
+      });
+    };
+  }, [currentUser, idleResetKey]);
 
   useLayoutEffect(() => {
     if (!authPanelContentRef.current || currentUser) {
@@ -175,6 +279,13 @@ function App() {
         createdAt: serverTimestamp(),
       });
 
+      sendLoginAlert({
+        email: credentials.user.email,
+        name: registerValues.fullName.trim(),
+      }).catch((error) => {
+        console.error(error);
+      });
+
       setRegisterValues(registerDefaults);
       setAuthMessage("Registration successful. Your secure session is active.");
     } catch (error) {
@@ -199,16 +310,49 @@ function App() {
       return;
     }
 
+    const normalizedEmail = loginValues.email.trim().toLowerCase();
+    let emailBelongsToAccount = false;
+
+    if (isLoginLocked(normalizedEmail)) {
+      setAuthMessage(lockedAccountMessage);
+      return;
+    }
+
     try {
       setAuthBusy(true);
-      await signInWithEmailAndPassword(
+      emailBelongsToAccount = await emailHasSignInMethods(normalizedEmail);
+      const credentials = await signInWithEmailAndPassword(
         auth,
-        loginValues.email.trim(),
+        normalizedEmail,
         loginValues.password,
       );
+      clearWrongPasswordAttempts(normalizedEmail);
+      sendLoginAlert({
+        email: credentials.user.email,
+        name: credentials.user.displayName,
+      }).catch((error) => {
+        console.error(error);
+      });
       setLoginValues(loginDefaults);
       setAuthMessage("Login successful.");
     } catch (error) {
+      if (
+        error.code === "auth/invalid-credential" &&
+        emailBelongsToAccount
+      ) {
+        const attempts = recordWrongPasswordAttempt(normalizedEmail);
+
+        if (attempts >= MAX_WRONG_PASSWORD_ATTEMPTS) {
+          setAuthMessage(lockedAccountMessage);
+          return;
+        }
+
+        setAuthMessage(
+          `Incorrect password. ${MAX_WRONG_PASSWORD_ATTEMPTS - attempts} attempt(s) remaining before this account is locked.`,
+        );
+        return;
+      }
+
       setAuthMessage(mapAuthError(error));
     } finally {
       setAuthBusy(false);
@@ -266,6 +410,14 @@ function App() {
 
     await signOut(auth);
     setAuthMessage("You have been signed out.");
+  }
+
+  function handleStaySignedIn() {
+    clearInterval(warningTimerRef.current);
+    setSessionWarningVisible(false);
+    setSessionWarningSeconds(IDLE_WARNING_SECONDS);
+    clearTimeout(idleTimerRef.current);
+    setIdleResetKey((key) => key + 1);
   }
 
   if (loading) {
@@ -471,6 +623,32 @@ function App() {
         </section>
       ) : (
         <section className="dashboard-stage">
+          {sessionWarningVisible ? (
+            <div className="session-timeout-overlay" role="alertdialog" aria-modal="true">
+              <div className="session-timeout-dialog panel">
+                <p className="section-kicker">Session check</p>
+                <h2>Are you still there?</h2>
+                <p className="muted-copy">
+                  For security, inactive banking sessions are signed out
+                  automatically. Confirm within {sessionWarningSeconds} seconds
+                  to keep this session active.
+                </p>
+                <div className="session-timeout-actions">
+                  <button
+                    className="primary-button"
+                    onClick={handleStaySignedIn}
+                    type="button"
+                  >
+                    Yes, keep me signed in
+                  </button>
+                  <button className="ghost-button" onClick={handleLogout} type="button">
+                    Sign out now
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <header className="dashboard-topbar panel">
             <div className="dashboard-brand-block">
               <BrandMark />
@@ -882,6 +1060,53 @@ function Field({
       {error ? <small>{error}</small> : null}
     </label>
   );
+}
+
+async function emailHasSignInMethods(email) {
+  if (!auth) {
+    return false;
+  }
+
+  try {
+    const methods = await fetchSignInMethodsForEmail(auth, email);
+    return methods.length > 0;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+function getLockoutKey(email) {
+  return `${LOGIN_LOCKOUT_PREFIX}${email}`;
+}
+
+function getWrongPasswordAttempts(email) {
+  const storedValue = window.localStorage.getItem(getLockoutKey(email));
+  const attempts = Number(storedValue);
+
+  if (!Number.isInteger(attempts) || attempts < 0) {
+    return 0;
+  }
+
+  return attempts;
+}
+
+function isLoginLocked(email) {
+  return getWrongPasswordAttempts(email) >= MAX_WRONG_PASSWORD_ATTEMPTS;
+}
+
+function recordWrongPasswordAttempt(email) {
+  const attempts = Math.min(
+    getWrongPasswordAttempts(email) + 1,
+    MAX_WRONG_PASSWORD_ATTEMPTS,
+  );
+
+  window.localStorage.setItem(getLockoutKey(email), String(attempts));
+  return attempts;
+}
+
+function clearWrongPasswordAttempts(email) {
+  window.localStorage.removeItem(getLockoutKey(email));
 }
 
 function mapAuthError(error) {

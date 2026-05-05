@@ -1370,6 +1370,37 @@ h2 {
   text-align: right;
 }
 
+.session-timeout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 16, 9, 0.68);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.session-timeout-dialog {
+  width: min(460px, 100%);
+  padding: 24px;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.session-timeout-dialog h2 {
+  margin-bottom: 10px;
+}
+
+.session-timeout-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+
 code {
   font-family: "SFMono-Regular", "Consolas", monospace;
   color: #fff;
