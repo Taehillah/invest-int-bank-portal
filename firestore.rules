@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function validName(value) {
+      return value is string
+        && value.size() >= 2
+        && value.size() <= 60
+        && value.matches('^[A-Za-z][A-Za-z\\s\'-]{1,59}$');
+    }
+
+    function validCurrency(value) {
+      return value is string && value.matches('^[A-Z]{3}$');
+    }
+
+    function validIban(value) {
+      return value is string
+        && value.size() >= 15
+        && value.size() <= 34
+        && value.matches('^[A-Z0-9]{15,34}$');
+    }
+
+    function validSwift(value) {
+      return value is string && value.matches('^[A-Z0-9]{8}([A-Z0-9]{3})?$');
+    }
+
+    function validReference(value) {
+      return value is string
+        && value.size() >= 6
+        && value.size() <= 140
+        && value.matches('^[A-Za-z0-9 .,\\-()/]{6,140}$');
+    }
+
+    match /profiles/{userId} {
+      allow read, create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['fullName', 'email', 'createdAt'])
+        && validName(request.resource.data.fullName)
+        && request.resource.data.email is string
+        && request.resource.data.email.matches('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$');
+
+      allow delete: if false;
+    }
+
+    match /customers/{userId}/payments/{paymentId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'amount',
+          'beneficiaryName',
+          'country',
+          'createdAt',
+          'currency',
+          'iban',
+          'reference',
+          'status',
+          'swiftCode'
+        ])
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.amount <= 1000000
+        && validName(request.resource.data.beneficiaryName)
+        && request.resource.data.country is string
+        && request.resource.data.country.matches('^[A-Za-z\\s-]{2,56}$')
+        && validCurrency(request.resource.data.currency)
+        && validIban(request.resource.data.iban)
+        && validSwift(request.resource.data.swiftCode)
+        && validReference(request.resource.data.reference)
+        && request.resource.data.status == 'SUBMITTED_FOR_SIMULATION';
+
+      allow update, delete: if false;
+    }
+  }
+}
