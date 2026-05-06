@@ -46,13 +46,45 @@ const loginDefaults = {
 
 const paymentDefaults = {
   beneficiaryName: "",
-  country: "",
+  country: "RSA",
   currency: "USD",
   amount: "",
   iban: "",
   swiftCode: "",
   reference: "",
 };
+
+const countryOptions = [
+  { flag: "🇦🇺", name: "Australia" },
+  { flag: "🇧🇷", name: "Brazil" },
+  { flag: "🇨🇦", name: "Canada" },
+  { flag: "🇨🇳", name: "China" },
+  { flag: "🇫🇷", name: "France" },
+  { flag: "🇩🇪", name: "Germany" },
+  { flag: "🇮🇳", name: "India" },
+  { flag: "🇮🇹", name: "Italy" },
+  { flag: "🇯🇵", name: "Japan" },
+  { flag: "🇳🇬", name: "Nigeria" },
+  { flag: "🇿🇦", name: "RSA" },
+  { flag: "🇪🇸", name: "Spain" },
+  { flag: "🇦🇪", name: "United Arab Emirates" },
+  { flag: "🇬🇧", name: "United Kingdom" },
+  { flag: "🇺🇸", name: "United States" },
+];
+
+const currencyOptions = [
+  { code: "AUD", flag: "🇦🇺", name: "Australian Dollar" },
+  { code: "BRL", flag: "🇧🇷", name: "Brazilian Real" },
+  { code: "CAD", flag: "🇨🇦", name: "Canadian Dollar" },
+  { code: "CNY", flag: "🇨🇳", name: "Chinese Yuan" },
+  { code: "EUR", flag: "🇪🇺", name: "Euro" },
+  { code: "GBP", flag: "🇬🇧", name: "Pound Sterling" },
+  { code: "INR", flag: "🇮🇳", name: "Indian Rupee" },
+  { code: "JPY", flag: "🇯🇵", name: "Japanese Yen" },
+  { code: "NGN", flag: "🇳🇬", name: "Nigerian Naira" },
+  { code: "USD", flag: "🇺🇸", name: "US Dollar" },
+  { code: "ZAR", flag: "🇿🇦", name: "South African Rand" },
+];
 
 const securityCards = [
   {
@@ -158,6 +190,38 @@ function App() {
   useEffect(() => {
     warningVisibleRef.current = sessionWarningVisible;
   }, [sessionWarningVisible]);
+
+  useEffect(() => {
+    if (!currentUser || !auth) {
+      return undefined;
+    }
+
+    const signOutForHiddenScreen = () => {
+      if (!document.hidden) {
+        return;
+      }
+
+      signOut(auth)
+        .then(() => {
+          setAuthMessage("You were signed out because the banking screen was left.");
+        })
+        .catch((error) => {
+          console.error("Automatic screen-leave sign out failed.", error);
+        });
+    };
+
+    const signOutForPageExit = () => {
+      signOut(auth).catch(() => {});
+    };
+
+    document.addEventListener("visibilitychange", signOutForHiddenScreen);
+    window.addEventListener("pagehide", signOutForPageExit);
+
+    return () => {
+      document.removeEventListener("visibilitychange", signOutForHiddenScreen);
+      window.removeEventListener("pagehide", signOutForPageExit);
+    };
+  }, [currentUser]);
 
   useEffect(() => {
     if (!currentUser || !auth) {
@@ -672,42 +736,6 @@ function App() {
             </div>
           </header>
 
-          <section className="hero-summary">
-            <article className="panel summary-panel summary-primary">
-              <div className="summary-copy">
-                <p className="section-kicker">Payments Desk</p>
-                <h2>Secure international payment requests at a glance</h2>
-                <p className="muted-copy">
-                  Review submitted transfer instructions inside a protected
-                  customer journey built for trust, clarity, and banker review.
-                </p>
-              </div>
-              <div className="summary-grid">
-                <StatBlock
-                  label="Payment requests"
-                  value={String(payments.length).padStart(2, "0")}
-                />
-                <StatBlock label="Instruction checks" value="In place" />
-                <StatBlock label="Service mode" value="Demo desk" />
-              </div>
-            </article>
-
-            <article className="panel summary-panel summary-side">
-              <p className="section-kicker">Client Protection</p>
-              <div className="signal-list">
-                {securityCards.map((card) => (
-                  <div className="signal-row" key={card.title}>
-                    <div className="signal-bullet" />
-                    <div>
-                      <strong>{card.title}</strong>
-                      <p>{card.body}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
-
           <section className="dashboard-grid">
             <section className="panel payment-workspace">
               <div className="section-heading">
@@ -737,7 +765,7 @@ function App() {
                   placeholder="Luca Meyer"
                 />
                 <div className="input-grid">
-                  <Field
+                  <SelectField
                     label="Country"
                     name="country"
                     value={paymentValues.country}
@@ -748,9 +776,14 @@ function App() {
                       }))
                     }
                     error={paymentErrors.country}
-                    placeholder="Germany"
-                  />
-                  <Field
+                  >
+                    {countryOptions.map((country) => (
+                      <option key={country.name} value={country.name}>
+                        {country.flag} {country.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <SelectField
                     label="Currency"
                     name="currency"
                     value={paymentValues.currency}
@@ -761,8 +794,13 @@ function App() {
                       }))
                     }
                     error={paymentErrors.currency}
-                    placeholder="USD"
-                  />
+                  >
+                    {currencyOptions.map((currency) => (
+                      <option key={currency.code} value={currency.code}>
+                        {currency.flag} {currency.code} - {currency.name}
+                      </option>
+                    ))}
+                  </SelectField>
                 </div>
                 <Field
                   label="Amount"
@@ -825,75 +863,42 @@ function App() {
               {paymentMessage ? <p className="status-text">{paymentMessage}</p> : null}
             </section>
 
-            <aside className="dashboard-side-stack">
-              <section className="panel notes-panel">
-                <p className="section-kicker">Presentation Notes</p>
-                <h2>What to explain during the banking demo</h2>
-                <ul className="security-list">
-                  <li>Client passwords are protected and never shown or stored in plain text.</li>
-                  <li>Payment details are checked before submission and again before they are accepted.</li>
-                  <li>Banking fields only accept expected formats such as IBAN, SWIFT, amount, and reference.</li>
-                  <li>Signed-in access is guarded against repeated misuse and unsafe session activity.</li>
-                  <li>The live banking portal runs over HTTPS to protect information in transit.</li>
-                </ul>
-              </section>
-
-              <section className="panel notes-panel">
-                <p className="section-kicker">Demonstration Flow</p>
-                <div className="tick-list">
-                  <div className="tick-row">
-                    <span className="tick-mark" />
-                    <span>Create a client profile</span>
-                  </div>
-                  <div className="tick-row">
-                    <span className="tick-mark" />
-                    <span>Show a rejected incorrect IBAN or amount</span>
-                  </div>
-                  <div className="tick-row">
-                    <span className="tick-mark" />
-                    <span>Send a valid international payment request</span>
-                  </div>
-                  <div className="tick-row">
-                    <span className="tick-mark" />
-                    <span>Show the secure lock on the live banking site</span>
-                  </div>
+            <section className="panel activity-panel">
+              <div className="section-heading">
+                <div>
+                  <p className="section-kicker">Submission Log</p>
+                  <h2>Recent payment requests</h2>
                 </div>
-              </section>
-            </aside>
-          </section>
-
-          <section className="panel activity-panel">
-            <div className="section-heading">
-              <div>
-                <p className="section-kicker">Submission Log</p>
-                <h2>Recent payment requests</h2>
+                <span className="chip chip-accent">
+                  {String(payments.length).padStart(2, "0")} saved
+                </span>
               </div>
-            </div>
 
-            {payments.length === 0 ? (
-              <p className="empty-state">
-                No payment requests yet. Send one to demonstrate the secure banking flow.
-              </p>
-            ) : (
-              <div className="payment-list">
-                {payments.map((payment) => (
-                  <article className="payment-card" key={payment.id}>
-                    <div>
-                      <p className="payment-amount">
-                        {payment.currency} {Number(payment.amount).toFixed(2)}
-                      </p>
-                      <p className="payment-meta">
-                        {payment.beneficiaryName} • {payment.country}
-                      </p>
-                    </div>
-                    <div className="payment-aside">
-                      <span className="chip chip-accent">{payment.status}</span>
-                      <p className="payment-reference">{payment.reference}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+              {payments.length === 0 ? (
+                <p className="empty-state">
+                  No payment requests yet. Send one to demonstrate the secure banking flow.
+                </p>
+              ) : (
+                <div className="payment-list">
+                  {payments.map((payment) => (
+                    <article className="payment-card" key={payment.id}>
+                      <div>
+                        <p className="payment-amount">
+                          {payment.currency} {Number(payment.amount).toFixed(2)}
+                        </p>
+                        <p className="payment-meta">
+                          {payment.beneficiaryName} • {payment.country}
+                        </p>
+                      </div>
+                      <div className="payment-aside">
+                        <span className="chip chip-accent">{payment.status}</span>
+                        <p className="payment-reference">{payment.reference}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
           </section>
         </section>
       )}
@@ -980,15 +985,6 @@ function BrandMark() {
   );
 }
 
-function StatBlock({ label, value }) {
-  return (
-    <div className="stat-block">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function AuthShowcase() {
   return (
     <section className="auth-showcase panel">
@@ -1057,6 +1053,30 @@ function Field({
         type={type}
         value={value}
       />
+      {error ? <small>{error}</small> : null}
+    </label>
+  );
+}
+
+function SelectField({
+  children,
+  error,
+  label,
+  name,
+  onChange,
+  value,
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select
+        className={error ? "input select-input error" : "input select-input"}
+        name={name}
+        onChange={onChange}
+        value={value}
+      >
+        {children}
+      </select>
       {error ? <small>{error}</small> : null}
     </label>
   );

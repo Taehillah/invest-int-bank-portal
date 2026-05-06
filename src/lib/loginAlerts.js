@@ -10,13 +10,13 @@ export function loginAlertsConfigured() {
 
 export async function sendLoginAlert({ email, name }) {
   if (!loginAlertsConfigured()) {
+    console.warn("Login alert email skipped because EmailJS is not configured.");
     return { skipped: true };
   }
 
   const loginContext = getLoginContext();
   const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
     body: JSON.stringify({
-      accessToken: emailJsConfig.publicKey,
       service_id: emailJsConfig.serviceId,
       template_id: emailJsConfig.templateId,
       user_id: emailJsConfig.publicKey,
@@ -36,7 +36,12 @@ export async function sendLoginAlert({ email, name }) {
   });
 
   if (!response.ok) {
-    throw new Error("Login alert email could not be sent.");
+    const details = await response.text().catch(() => "");
+    throw new Error(
+      details
+        ? `Login alert email could not be sent: ${details}`
+        : "Login alert email could not be sent.",
+    );
   }
 
   return { skipped: false };
