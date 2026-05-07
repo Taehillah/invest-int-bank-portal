@@ -343,15 +343,15 @@ function App() {
         createdAt: serverTimestamp(),
       });
 
-      sendLoginAlert({
+      const loginAlertMessage = await getLoginAlertMessage({
         email: credentials.user.email,
         name: registerValues.fullName.trim(),
-      }).catch((error) => {
-        console.error(error);
       });
 
       setRegisterValues(registerDefaults);
-      setAuthMessage("Registration successful. Your secure session is active.");
+      setAuthMessage(
+        `Registration successful. Your secure session is active. ${loginAlertMessage}`,
+      );
     } catch (error) {
       setAuthMessage(mapAuthError(error));
     } finally {
@@ -391,14 +391,12 @@ function App() {
         loginValues.password,
       );
       clearWrongPasswordAttempts(normalizedEmail);
-      sendLoginAlert({
+      const loginAlertMessage = await getLoginAlertMessage({
         email: credentials.user.email,
         name: credentials.user.displayName,
-      }).catch((error) => {
-        console.error(error);
       });
       setLoginValues(loginDefaults);
-      setAuthMessage("Login successful.");
+      setAuthMessage(`Login successful. ${loginAlertMessage}`);
     } catch (error) {
       if (
         error.code === "auth/invalid-credential" &&
@@ -1030,6 +1028,21 @@ function AuthShowcase() {
       </div>
     </section>
   );
+}
+
+async function getLoginAlertMessage({ email, name }) {
+  try {
+    const result = await sendLoginAlert({ email, name });
+
+    if (result.skipped) {
+      return "Login alert email was skipped because EmailJS is not configured.";
+    }
+
+    return "Login alert email sent.";
+  } catch (error) {
+    console.error(error);
+    return "Login alert email could not be sent. Check the EmailJS service, template, and public key.";
+  }
 }
 
 function Field({
