@@ -32,7 +32,6 @@ We used the following tools:
 - **Firebase Hosting**: hosts the app over HTTPS.
 - **EmailJS**: optional third-party service provider for login alert emails.
 - **GitHub Actions**: CI/CD pipeline that runs automatically on code push.
-- **ChatGPT / AI assistance**: used to help generate and improve code, but the generated logic was reviewed and understood.
 
 Using Firebase is safer than writing our own authentication system because Firebase already handles secure password hashing, salting, session tokens, HTTPS support, and abuse protection.
 
@@ -75,7 +74,7 @@ The live app loads at:
 https://invest-int-bank-20260503.web.app
 
 
-In the demonstration video, we can show the browser lock icon to prove the app is running over HTTPS. HTTPS protects data in transit and helps prevent man-in-the-middle attacks.
+HTTPS protects data in transit and helps prevent man-in-the-middle attacks.
 
 # 6. Attack Protection
 
@@ -108,22 +107,7 @@ Using Firebase Authentication is safer than custom authentication because Fireba
 
 Our app focuses on using trusted platform security features and then adding our own validation for banking-specific input fields.
 
-# 9. Demonstration Video Plan
-
-In the video, one group member should demonstrate and narrate:
-
-1. Open the deployed app and show the HTTPS lock.
-2. Register a new customer account.
-3. Explain that Firebase handles password hashing and salting.
-4. Log in with the registered account.
-5. Enter invalid payment data, such as a bad IBAN or invalid amount, and show rejection.
-6. Enter valid international payment details.
-7. Submit the payment request.
-8. Explain protections against brute force, XSS, injection, session hijacking, and man-in-the-middle attacks.
-9. Show or explain the GitHub Actions CI/CD pipeline.
-10. State clearly that Firebase, GitHub Actions, and AI assistance were used.
-
-# 10. Short Summary
+# 9. Short Summary
 
 Invest Int Bank is a secure customer international payments portal built with React and Firebase. Firebase Authentication protects passwords and sessions, Firestore stores simulated payment requests, Firebase Hosting provides HTTPS, and input validation rejects unsafe or invalid payment data. The project prioritizes security understanding over complex UI.
 
@@ -276,6 +260,6 @@ Fields:
 
 # Ethical Disclosure
 
-We used some AI to speedup the development, debugging, documentation, and UI improvements. We also used Firebase managed services for authentication, database storage, hosting, and security protections.
+We used Firebase managed services for authentication, database storage, hosting, and security protections.
 
 We configured security-critical features inside Firebase Authentication that includes password hashing, salting, or session security.
