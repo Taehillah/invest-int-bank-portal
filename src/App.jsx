@@ -167,7 +167,10 @@ function App() {
   const idleTimerRef = useRef(null);
   const warningTimerRef = useRef(null);
   const warningVisibleRef = useRef(false);
-  const accessProfile = accessProfiles[accessMode];
+  const activeAccessMode = currentUser
+    ? getAccessModeForUser(currentUser)
+    : accessMode;
+  const accessProfile = accessProfiles[activeAccessMode];
 
   useEffect(() => {
     if (!firebaseReady || !auth) {
@@ -187,6 +190,9 @@ function App() {
 
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         setCurrentUser(user);
+        if (user) {
+          setAccessMode(getAccessModeForUser(user));
+        }
         try {
           if (user) {
             await loadPayments(user.uid);
@@ -354,6 +360,7 @@ function App() {
         normalizedEmail,
         loginValues.password,
       );
+      setAccessMode(getAccessModeForUser(credentials.user));
       clearWrongPasswordAttempts(normalizedEmail);
       const loginAlertMessage = await getLoginAlertMessage({
         email: credentials.user.email,
@@ -1015,6 +1022,22 @@ function recordWrongPasswordAttempt(email) {
 
 function clearWrongPasswordAttempts(email) {
   window.localStorage.removeItem(getLockoutKey(email));
+}
+
+function getAccessModeForUser(user) {
+  const email = user?.email?.toLowerCase() || "";
+  const displayName = user?.displayName?.toLowerCase() || "";
+  const identityText = `${email} ${displayName}`;
+
+  if (identityText.includes("employee") || identityText.includes("staff")) {
+    return "employee";
+  }
+
+  if (identityText.includes("customer")) {
+    return "customer";
+  }
+
+  return "customer";
 }
 
 function mapAuthError(error) {
