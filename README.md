@@ -123,20 +123,7 @@ Using Firebase Authentication is safer than custom authentication because Fireba
 
 Our app focuses on using trusted platform security features and then adding our own validation for banking-specific input fields.
 
-# 9. Video Hand-In
-
-For the final submission, record a short demo video with OBS and upload it as an unlisted YouTube video. The video should show:
-
-- The deployed HTTPS portal.
-- No public registration process for customers or employees.
-- Login with a bank-created user.
-- Rejection of invalid payment input.
-- Successful simulated international payment submission.
-- Firestore payment storage and Firestore rules.
-- CircleCI pipeline execution.
-- SonarQube/SonarCloud hotspot and code-smell scan result.
-
-# 10. Short Summary
+# 9. Short Summary
 
 Invest Int Bank is a secure customer international payments portal built with React and Firebase. Firebase Authentication protects bank-created user passwords and sessions, Firestore stores simulated payment requests, Firebase Hosting provides HTTPS, CircleCI runs SonarQube scanning, and input validation rejects unsafe or invalid payment data. The project prioritizes security understanding over complex UI.
 
