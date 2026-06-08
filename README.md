@@ -202,11 +202,11 @@ The user then has 60 seconds to confirm that they want to stay signed in. If the
 
 If a member enters the correct email but enters the wrong password three times, the app locks the login path for that email on that browser. The member is then shown a message telling them to visit the bank physically to have the password reset.
 
-This feature supports the banking security demonstration by showing that repeated failed login attempts are not ignored. Firebase Authentication also provides managed abuse protection, while the app adds a clear customer-facing lockout message for the demo.
+This feature supports banking security by showing that repeated failed login attempts are not ignored. Firebase Authentication also provides managed abuse protection, while the app adds a clear customer-facing lockout message.
 
 # Optional Login Alert Emails
 
-The app supports optional login alert emails using **EmailJS**, which is a third-party service provider. EmailJS is convenient for a demo because it can send directly from the frontend and its free plan is enough for a small number of demonstration emails.
+The app supports optional login alert emails using **EmailJS**, which is a third-party service provider. EmailJS can send directly from the frontend and is suitable for a small number of login alert emails.
 
 When the feature is configured, a member receives an email after login. The alert email can include the login time, browser/device information, and timezone. The app does not track exact physical location because that would require extra browser permission or an IP location service and may create privacy and reliability issues.
 
