@@ -430,6 +430,11 @@ strong {
   flex: 0 0 auto;
 }
 
+.auth-stage .brand-logo {
+  width: 68px;
+  height: 68px;
+}
+
 .brand-mark strong {
   display: block;
   font-size: 0.96rem;
