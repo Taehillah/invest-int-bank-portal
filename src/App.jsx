@@ -28,6 +28,45 @@ const loginDefaults = {
   password: "",
 };
 
+const accessProfiles = {
+  customer: {
+    label: "Customer",
+    kicker: "Customer Sign-In",
+    title: "Customer payments portal",
+    description: "Log in with a bank-created customer account to submit international payment requests.",
+    placeholder: "customer@example.com",
+    passwordPlaceholder: "Your customer password",
+    button: "Enter customer portal",
+    dashboardKicker: "Customer Session",
+    dashboardFallback: "Customer",
+    workspaceKicker: "New Customer Instruction",
+    workspaceTitle: "International payment request",
+    workspaceDescription:
+      "Capture beneficiary and settlement details for secure banker review and customer confirmation.",
+    emptyState: "No payment requests yet. Send one to demonstrate the secure customer banking flow.",
+    accountNote:
+      "Customer accounts are created by the bank before use. This portal does not allow public self-registration.",
+  },
+  employee: {
+    label: "Employee",
+    kicker: "Employee Sign-In",
+    title: "Employee payments workspace",
+    description: "Log in with a bank-created employee account to access the secure payments desk.",
+    placeholder: "employee@example.com",
+    passwordPlaceholder: "Your employee password",
+    button: "Enter employee workspace",
+    dashboardKicker: "Employee Session",
+    dashboardFallback: "Employee",
+    workspaceKicker: "Payments Desk",
+    workspaceTitle: "International payment capture",
+    workspaceDescription:
+      "Capture or review international payment details inside a controlled employee workspace.",
+    emptyState: "No payment requests yet. Use a demo request to show the secure employee workflow.",
+    accountNote:
+      "Employee accounts are created by the bank administrator. Employees cannot register from this portal.",
+  },
+};
+
 const paymentDefaults = {
   beneficiaryName: "",
   country: "RSA",
@@ -92,7 +131,7 @@ const authSignals = [
 ];
 
 const dashboardSignals = [
-  { label: "Client access", value: "Verified" },
+  { label: "Account access", value: "Verified" },
   { label: "Payments desk", value: "Open" },
   { label: "Connection", value: "Encrypted" },
 ];
@@ -106,6 +145,7 @@ const lockedAccountMessage =
   "This account has been locked after three incorrect password attempts. Please visit the bank physically to have your password reset.";
 
 function App() {
+  const [accessMode, setAccessMode] = useState("customer");
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authBusy, setAuthBusy] = useState(false);
@@ -127,6 +167,7 @@ function App() {
   const idleTimerRef = useRef(null);
   const warningTimerRef = useRef(null);
   const warningVisibleRef = useRef(false);
+  const accessProfile = accessProfiles[accessMode];
 
   useEffect(() => {
     if (!firebaseReady || !auth) {
@@ -272,7 +313,7 @@ function App() {
     }
 
     setAuthPanelHeight(`${authPanelContentRef.current.scrollHeight}px`);
-  }, [authMessage, currentUser, loginErrors]);
+  }, [accessMode, authMessage, currentUser, loginErrors]);
 
   async function loadPayments(userId) {
     if (!db) {
@@ -448,11 +489,27 @@ function App() {
 
           <aside className="auth-card panel">
             <div className="auth-card-header">
-              <p className="section-kicker">Client Sign-In</p>
-              <h2>Welcome back to Invest Int Bank</h2>
-              <p className="muted-copy">
-                Continue to your international payments desk with a bank-issued account.
-              </p>
+              <p className="section-kicker">{accessProfile.kicker}</p>
+              <h2>{accessProfile.title}</h2>
+              <p className="muted-copy">{accessProfile.description}</p>
+            </div>
+
+            <div className="switcher" role="tablist" aria-label="Portal access type">
+              {Object.entries(accessProfiles).map(([key, profile]) => (
+                <button
+                  aria-selected={accessMode === key}
+                  className={accessMode === key ? "switcher-tab active" : "switcher-tab"}
+                  key={key}
+                  onClick={() => {
+                    setAccessMode(key);
+                    setAuthMessage("");
+                    setLoginErrors({});
+                  }}
+                  type="button"
+                >
+                  {profile.label}
+                </button>
+              ))}
             </div>
 
             <div className="auth-panel-height" style={{ height: authPanelHeight }}>
@@ -470,7 +527,7 @@ function App() {
                       }))
                     }
                     error={loginErrors.email}
-                    placeholder="employee@example.com"
+                    placeholder={accessProfile.placeholder}
                   />
                   <Field
                     label="Password"
@@ -484,25 +541,23 @@ function App() {
                       }))
                     }
                     error={loginErrors.password}
-                    placeholder="Your bank-issued password"
+                    placeholder={accessProfile.passwordPlaceholder}
                   />
 
                   <button className="primary-button" disabled={authBusy} type="submit">
-                    {authBusy ? "Signing in..." : "Enter banking portal"}
+                    {authBusy ? "Signing in..." : accessProfile.button}
                   </button>
                 </form>
 
                 {authMessage ? <p className="status-text">{authMessage}</p> : null}
-                <p className="status-text">
-                  Accounts are created by the bank administrator. Self-registration is disabled.
-                </p>
+                <p className="status-text">{accessProfile.accountNote}</p>
               </div>
             </div>
 
             <div className="auth-footer-note">
-              <span>Protected client sign-in</span>
+              <span>Protected customer access</span>
+              <span>Controlled employee access</span>
               <span>Encrypted banking access</span>
-              <span>Verified payment details</span>
             </div>
 
             <AuthShowcase />
@@ -540,8 +595,8 @@ function App() {
             <div className="dashboard-brand-block">
               <BrandMark />
               <div>
-                <p className="section-kicker">Authenticated Session</p>
-                <h1>Welcome, {currentUser.displayName || "Customer"}</h1>
+                <p className="section-kicker">{accessProfile.dashboardKicker}</p>
+                <h1>Welcome, {currentUser.displayName || accessProfile.dashboardFallback}</h1>
               </div>
             </div>
 
@@ -563,12 +618,9 @@ function App() {
             <section className="panel payment-workspace">
               <div className="section-heading">
                 <div>
-                  <p className="section-kicker">New Instruction</p>
-                  <h2>International payment request</h2>
-                  <p className="muted-copy">
-                    Capture beneficiary and settlement details for secure banker
-                    review and customer confirmation.
-                  </p>
+                  <p className="section-kicker">{accessProfile.workspaceKicker}</p>
+                  <h2>{accessProfile.workspaceTitle}</h2>
+                  <p className="muted-copy">{accessProfile.workspaceDescription}</p>
                 </div>
                 <span className="chip chip-accent">Encrypted access</span>
               </div>
@@ -698,9 +750,7 @@ function App() {
               </div>
 
               {payments.length === 0 ? (
-                <p className="empty-state">
-                  No payment requests yet. Send one to demonstrate the secure banking flow.
-                </p>
+                <p className="empty-state">{accessProfile.emptyState}</p>
               ) : (
                 <div className="payment-list">
                   {payments.map((payment) => (

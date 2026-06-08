@@ -18,7 +18,7 @@ https://invest-int-bank-20260503.web.app
 
 # 1. What We Built
 
-We built a customer international payments portal called **Invest Int Bank**. The app includes login for pre-created users and a simulated international payment form where users can enter beneficiary and payment details.
+We built a customer international payments portal called **Invest Int Bank**. The app includes separate login choices for customers and employees, both using pre-created accounts, plus a simulated international payment form where users can enter beneficiary and payment details.
 
 The app was built using **React with Vite** for the frontend, **Firebase Authentication** for secure pre-created user login, **Cloud Firestore** for storing simulated payment requests, and **Firebase Hosting** for HTTPS deployment.
 
@@ -44,7 +44,7 @@ Hashing means the password is converted into a one-way encrypted-looking value. 
 
 We chose Firebase instead of custom password storage because writing our own password system could easily lead to insecure storage, weak hashing, or misconfiguration.
 
-Users are created by the bank administrator in Firebase Authentication. The React portal does not include a registration form and does not call Firebase's account-creation method from the browser.
+Users are created by the bank administrator in Firebase Authentication. The React portal does not include a registration form and does not call Firebase's account-creation method from the browser. Employees cannot register themselves.
 
 # 4. Input Whitelisting
 
@@ -87,7 +87,7 @@ The Firebase Hosting configuration also adds security headers including HSTS, fr
 The app protects against common attacks in the following ways:
 
 - **Brute force attacks**: Firebase Authentication includes built-in protections against repeated suspicious login attempts.
-- **Unauthorized self-registration**: the React app does not expose a registration form or call `createUserWithEmailAndPassword`; users must be created by the bank administrator in Firebase Authentication.
+- **Unauthorized self-registration**: the React app does not expose a registration form or call `createUserWithEmailAndPassword`; customer and employee users must be created by the bank administrator in Firebase Authentication.
 - **XSS**: React escapes rendered text by default, reducing the risk of injected scripts running in the page.
 - **Injection attacks**: Inputs are validated with whitelisting and stored through Firebase SDK methods rather than building raw database queries.
 - **Session hijacking**: Firebase manages secure authentication sessions and tokens instead of custom session code.
@@ -128,7 +128,7 @@ Our app focuses on using trusted platform security features and then adding our 
 For the final submission, record a short demo video with OBS and upload it as an unlisted YouTube video. The video should show:
 
 - The deployed HTTPS portal.
-- No public registration process.
+- No public registration process for customers or employees.
 - Login with a bank-created user.
 - Rejection of invalid payment input.
 - Successful simulated international payment submission.
@@ -144,7 +144,7 @@ Invest Int Bank is a secure customer international payments portal built with Re
 
 # Main Features
 
-- Login for bank-created users using Firebase Authentication.
+- Separate Customer and Employee login choices using Firebase Authentication.
 - No public registration process in the React app.
 - Protected dashboard for authenticated users.
 - In-memory authentication session so users are not automatically logged in from saved PC sessions.

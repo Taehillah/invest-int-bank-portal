@@ -6,8 +6,9 @@
 
 ## Bank-Created User Access
 
+- Show the Customer and Employee login choices.
 - Show that the login screen has no registration tab or registration form.
-- Explain that accounts are created by the bank administrator in Firebase Authentication.
+- Explain that customer and employee accounts are created by the bank administrator in Firebase Authentication.
 - Explain:
   - Firebase Authentication stores passwords securely using hashing and salting.
   - This is safer than writing custom password storage code.
