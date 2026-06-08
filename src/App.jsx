@@ -1,22 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  createUserWithEmailAndPassword,
   fetchSignInMethodsForEmail,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
-  updateProfile,
 } from "firebase/auth";
 import {
-  addDoc,
-  collection,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
+  createPaymentRequest,
+  listPaymentRequests,
+} from "./lib/paymentsApi";
 import {
   auth,
   authPersistenceReady,
@@ -27,17 +19,9 @@ import {
 import {
   validateLogin,
   validatePayment,
-  validateRegistration,
 } from "./lib/validators";
 import { sendLoginAlert } from "./lib/loginAlerts";
 import bankLogo from "./assets/invest-int-bank-logo.svg";
-
-const registerDefaults = {
-  fullName: "",
-  email: "",
-  password: "",
-  confirmPassword: "",
-};
 
 const loginDefaults = {
   email: "",
@@ -122,15 +106,12 @@ const lockedAccountMessage =
   "This account has been locked after three incorrect password attempts. Please visit the bank physically to have your password reset.";
 
 function App() {
-  const [authMode, setAuthMode] = useState("login");
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authBusy, setAuthBusy] = useState(false);
   const [paymentBusy, setPaymentBusy] = useState(false);
-  const [registerValues, setRegisterValues] = useState(registerDefaults);
   const [loginValues, setLoginValues] = useState(loginDefaults);
   const [paymentValues, setPaymentValues] = useState(paymentDefaults);
-  const [registerErrors, setRegisterErrors] = useState({});
   const [loginErrors, setLoginErrors] = useState({});
   const [paymentErrors, setPaymentErrors] = useState({});
   const [authMessage, setAuthMessage] = useState("");
@@ -291,72 +272,14 @@ function App() {
     }
 
     setAuthPanelHeight(`${authPanelContentRef.current.scrollHeight}px`);
-  }, [authMode, authMessage, currentUser, loginErrors, registerErrors]);
+  }, [authMessage, currentUser, loginErrors]);
 
   async function loadPayments(userId) {
     if (!db) {
       return;
     }
 
-    const paymentsRef = collection(db, "customers", userId, "payments");
-    const paymentsQuery = query(paymentsRef, orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(paymentsQuery);
-
-    setPayments(
-      snapshot.docs.map((entry) => ({
-        id: entry.id,
-        ...entry.data(),
-      })),
-    );
-  }
-
-  async function handleRegisterSubmit(event) {
-    event.preventDefault();
-    const errors = validateRegistration(registerValues);
-    setRegisterErrors(errors);
-    setAuthMessage("");
-
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
-
-    if (!auth || !db) {
-      setAuthMessage("Configure Firebase environment variables before registering.");
-      return;
-    }
-
-    try {
-      setAuthBusy(true);
-      const credentials = await createUserWithEmailAndPassword(
-        auth,
-        registerValues.email.trim(),
-        registerValues.password,
-      );
-
-      await updateProfile(credentials.user, {
-        displayName: registerValues.fullName.trim(),
-      });
-
-      await setDoc(doc(db, "profiles", credentials.user.uid), {
-        fullName: registerValues.fullName.trim(),
-        email: registerValues.email.trim(),
-        createdAt: serverTimestamp(),
-      });
-
-      const loginAlertMessage = await getLoginAlertMessage({
-        email: credentials.user.email,
-        name: registerValues.fullName.trim(),
-      });
-
-      setRegisterValues(registerDefaults);
-      setAuthMessage(
-        `Registration successful. Your secure session is active. ${loginAlertMessage}`,
-      );
-    } catch (error) {
-      setAuthMessage(mapAuthError(error));
-    } finally {
-      setAuthBusy(false);
-    }
+    setPayments(await listPaymentRequests(db, userId));
   }
 
   async function handleLoginSubmit(event) {
@@ -438,17 +361,7 @@ function App() {
 
     try {
       setPaymentBusy(true);
-      await addDoc(collection(db, "customers", currentUser.uid, "payments"), {
-        amount: Number(normalized.amount),
-        beneficiaryName: normalized.beneficiaryName,
-        country: normalized.country,
-        createdAt: serverTimestamp(),
-        currency: normalized.currency,
-        iban: normalized.iban,
-        reference: normalized.reference,
-        status: "SUBMITTED_FOR_SIMULATION",
-        swiftCode: normalized.swiftCode,
-      });
+      await createPaymentRequest(db, currentUser.uid, normalized);
 
       setPaymentValues(paymentDefaults);
       setPaymentMessage(
@@ -511,7 +424,7 @@ function App() {
             <h2>Complete bank portal setup</h2>
             <p className="muted-copy">
               The interface is ready. Add the project keys below to enable
-              client registration, sign-in, and payment request storage.
+              pre-created user sign-in and payment request storage.
             </p>
 
             <div className="config-list">
@@ -536,141 +449,53 @@ function App() {
           <aside className="auth-card panel">
             <div className="auth-card-header">
               <p className="section-kicker">Client Sign-In</p>
-              <h2>
-                {authMode === "login"
-                  ? "Welcome back to Invest Int Bank"
-                  : "Open your secure banking profile"}
-              </h2>
+              <h2>Welcome back to Invest Int Bank</h2>
               <p className="muted-copy">
-                {authMode === "login"
-                  ? "Continue to your international payments desk."
-                  : "Register with a strong password to begin secure cross-border banking."}
+                Continue to your international payments desk with a bank-issued account.
               </p>
-            </div>
-
-            <div className="switcher" role="tablist" aria-label="Authentication mode">
-              <button
-                aria-selected={authMode === "login"}
-                className={authMode === "login" ? "switcher-tab active" : "switcher-tab"}
-                onClick={() => setAuthMode("login")}
-                type="button"
-              >
-                Login
-              </button>
-              <button
-                aria-selected={authMode === "register"}
-                className={
-                  authMode === "register" ? "switcher-tab active" : "switcher-tab"
-                }
-                onClick={() => setAuthMode("register")}
-                type="button"
-              >
-                Register
-              </button>
             </div>
 
             <div className="auth-panel-height" style={{ height: authPanelHeight }}>
               <div className="auth-panel-content" ref={authPanelContentRef}>
-                {authMode === "register" ? (
-                  <form className="form-stack auth-form" onSubmit={handleRegisterSubmit}>
-                    <Field
-                      label="Full name"
-                      name="fullName"
-                      value={registerValues.fullName}
-                      onChange={(event) =>
-                        setRegisterValues((current) => ({
-                          ...current,
-                          fullName: event.target.value,
-                        }))
-                      }
-                      error={registerErrors.fullName}
-                      placeholder="Amina Dlamini"
-                    />
-                    <Field
-                      label="Email address"
-                      name="email"
-                      type="email"
-                      value={registerValues.email}
-                      onChange={(event) =>
-                        setRegisterValues((current) => ({
-                          ...current,
-                          email: event.target.value,
-                        }))
-                      }
-                      error={registerErrors.email}
-                      placeholder="customer@example.com"
-                    />
-                    <Field
-                      label="Password"
-                      name="password"
-                      type="password"
-                      value={registerValues.password}
-                      onChange={(event) =>
-                        setRegisterValues((current) => ({
-                          ...current,
-                          password: event.target.value,
-                        }))
-                      }
-                      error={registerErrors.password}
-                      placeholder="12+ chars with symbols"
-                    />
-                    <Field
-                      label="Confirm password"
-                      name="confirmPassword"
-                      type="password"
-                      value={registerValues.confirmPassword}
-                      onChange={(event) =>
-                        setRegisterValues((current) => ({
-                          ...current,
-                          confirmPassword: event.target.value,
-                        }))
-                      }
-                      error={registerErrors.confirmPassword}
-                      placeholder="Repeat password"
-                    />
+                <form className="form-stack auth-form" onSubmit={handleLoginSubmit}>
+                  <Field
+                    label="Email address"
+                    name="loginEmail"
+                    type="email"
+                    value={loginValues.email}
+                    onChange={(event) =>
+                      setLoginValues((current) => ({
+                        ...current,
+                        email: event.target.value,
+                      }))
+                    }
+                    error={loginErrors.email}
+                    placeholder="employee@example.com"
+                  />
+                  <Field
+                    label="Password"
+                    name="loginPassword"
+                    type="password"
+                    value={loginValues.password}
+                    onChange={(event) =>
+                      setLoginValues((current) => ({
+                        ...current,
+                        password: event.target.value,
+                      }))
+                    }
+                    error={loginErrors.password}
+                    placeholder="Your bank-issued password"
+                  />
 
-                    <button className="primary-button" disabled={authBusy} type="submit">
-                      {authBusy ? "Creating account..." : "Open banking profile"}
-                    </button>
-                  </form>
-                ) : (
-                  <form className="form-stack auth-form" onSubmit={handleLoginSubmit}>
-                    <Field
-                      label="Email address"
-                      name="loginEmail"
-                      type="email"
-                      value={loginValues.email}
-                      onChange={(event) =>
-                        setLoginValues((current) => ({
-                          ...current,
-                          email: event.target.value,
-                        }))
-                      }
-                      error={loginErrors.email}
-                      placeholder="customer@example.com"
-                    />
-                    <Field
-                      label="Password"
-                      name="loginPassword"
-                      type="password"
-                      value={loginValues.password}
-                      onChange={(event) =>
-                        setLoginValues((current) => ({
-                          ...current,
-                          password: event.target.value,
-                        }))
-                      }
-                      error={loginErrors.password}
-                      placeholder="Your password"
-                    />
-
-                    <button className="primary-button" disabled={authBusy} type="submit">
-                      {authBusy ? "Signing in..." : "Enter banking portal"}
-                    </button>
-                  </form>
-                )}
+                  <button className="primary-button" disabled={authBusy} type="submit">
+                    {authBusy ? "Signing in..." : "Enter banking portal"}
+                  </button>
+                </form>
 
                 {authMessage ? <p className="status-text">{authMessage}</p> : null}
+                <p className="status-text">
+                  Accounts are created by the bank administrator. Self-registration is disabled.
+                </p>
               </div>
             </div>
 
@@ -913,7 +738,7 @@ function AuthVisual() {
         <p className="section-kicker">Cross-Border Banking</p>
         <h1>Move funds across borders with trusted client access.</h1>
         <p className="lead">
-          A secure customer space for onboarding and international payment
+          A secure customer space for pre-created users and international payment
           requests, designed for confidence, control, and banker review.
         </p>
       </div>
@@ -1144,14 +969,10 @@ function clearWrongPasswordAttempts(email) {
 
 function mapAuthError(error) {
   switch (error.code) {
-    case "auth/email-already-in-use":
-      return "This email address is already registered.";
     case "auth/invalid-credential":
       return "Incorrect email or password.";
     case "auth/too-many-requests":
       return "Too many attempts detected. Please wait and try again.";
-    case "auth/weak-password":
-      return "Choose a stronger password that meets the policy.";
     default:
       return "Authentication failed. Verify Firebase setup and try again.";
   }

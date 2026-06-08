@@ -1,6 +1,6 @@
 # Invest Int Bank Customer International Payments Portal
 
-Invest Int Bank is a secure customer international payments portal. The app focuses on customer registration, customer login, payment input validation, HTTPS deployment, and clear security explanation for the assessment.
+Invest Int Bank is a secure customer international payments portal. The app focuses on bank-created user access, secure login, payment input validation, HTTPS deployment, CircleCI/SonarQube scanning, and clear security explanation for the assessment.
 
 Live app:
 
@@ -18,20 +18,21 @@ https://invest-int-bank-20260503.web.app
 
 # 1. What We Built
 
-We built a customer international payments portal called **Invest Int Bank**. The app includes customer registration, customer login, and a simulated international payment form where users can enter beneficiary and payment details.
+We built a customer international payments portal called **Invest Int Bank**. The app includes login for pre-created users and a simulated international payment form where users can enter beneficiary and payment details.
 
-The app was built using **React with Vite** for the frontend, **Firebase Authentication** for secure registration and login, **Cloud Firestore** for storing simulated payment requests, and **Firebase Hosting** for HTTPS deployment.
+The app was built using **React with Vite** for the frontend, **Firebase Authentication** for secure pre-created user login, **Cloud Firestore** for storing simulated payment requests, and **Firebase Hosting** for HTTPS deployment.
 
 # 2. Tools Used
 
 We used the following tools:
 
 - **React / JavaScript**: frontend application and form logic.
-- **Firebase Authentication**: secure user registration, login, password handling, and session management.
+- **Firebase Authentication**: secure bank-created user login, password handling, and session management.
 - **Cloud Firestore**: stores customer payment simulation data.
 - **Firebase Hosting**: hosts the app over HTTPS.
 - **EmailJS**: optional third-party service provider for login alert emails.
-- **GitHub Actions**: CI/CD pipeline that runs automatically on code push.
+- **CircleCI**: CI pipeline that runs automatically from the GitHub repository.
+- **SonarQube / SonarCloud scanner**: checks for security hotspots and code smells.
 
 Using Firebase is safer than writing our own authentication system because Firebase already handles secure password hashing, salting, session tokens, HTTPS support, and abuse protection.
 
@@ -43,14 +44,17 @@ Hashing means the password is converted into a one-way encrypted-looking value. 
 
 We chose Firebase instead of custom password storage because writing our own password system could easily lead to insecure storage, weak hashing, or misconfiguration.
 
+Users are created by the bank administrator in Firebase Authentication. The React portal does not include a registration form and does not call Firebase's account-creation method from the browser.
+
 # 4. Input Whitelisting
 
-The app validates user input before allowing registration or payment submission.
+The app validates user input before allowing login or payment submission.
 
 We validate:
 
 - Email address format
-- Full name format
+- Beneficiary name format
+- Country and currency format
 - Payment amount
 - IBAN / account number
 - SWIFT / BIC code
@@ -76,11 +80,14 @@ https://invest-int-bank-20260503.web.app
 
 HTTPS protects data in transit and helps prevent man-in-the-middle attacks.
 
+The Firebase Hosting configuration also adds security headers including HSTS, frame denial, content type protection, referrer policy, and a restrictive permissions policy.
+
 # 6. Attack Protection
 
 The app protects against common attacks in the following ways:
 
 - **Brute force attacks**: Firebase Authentication includes built-in protections against repeated suspicious login attempts.
+- **Unauthorized self-registration**: the React app does not expose a registration form or call `createUserWithEmailAndPassword`; users must be created by the bank administrator in Firebase Authentication.
 - **XSS**: React escapes rendered text by default, reducing the risk of injected scripts running in the page.
 - **Injection attacks**: Inputs are validated with whitelisting and stored through Firebase SDK methods rather than building raw database queries.
 - **Session hijacking**: Firebase manages secure authentication sessions and tokens instead of custom session code.
@@ -93,13 +100,22 @@ Firestore security rules are also used to restrict access to authenticated users
 
 # 7. DevSecOps / CI/CD Pipeline
 
-We used a basic CI/CD pipeline with **GitHub Actions**. The pipeline runs automatically when code is pushed.
+We used a **CircleCI** pipeline connected to the GitHub repository. The pipeline runs automatically when code is pushed.
 
-The pipeline improves security because it gives automated checks before deployment. It helps catch build errors early, keeps deployment repeatable, and reduces manual mistakes. Automation is important in DevSecOps because security and quality checks should happen continuously, not only at the end.
+The pipeline improves security because it gives automated checks before deployment. It installs dependencies, builds the React app, audits production dependencies, and runs a SonarQube/SonarCloud scan for security hotspots and code smells. Automation is important in DevSecOps because security and quality checks should happen continuously, not only at the end.
 
-The workflow file is located in:
+The CircleCI workflow file is located in:
 
-.github/workflows/security-ci.yml
+.circleci/config.yml
+
+The SonarQube scanner settings are located in:
+
+sonar-project.properties
+
+CircleCI must be configured with these environment variables before the scan can run:
+
+- `SONAR_TOKEN`
+- `SONAR_HOST_URL`
 
 # 8. Why Managed Security Is Safer
 
@@ -107,16 +123,29 @@ Using Firebase Authentication is safer than custom authentication because Fireba
 
 Our app focuses on using trusted platform security features and then adding our own validation for banking-specific input fields.
 
-# 9. Short Summary
+# 9. Video Hand-In
 
-Invest Int Bank is a secure customer international payments portal built with React and Firebase. Firebase Authentication protects passwords and sessions, Firestore stores simulated payment requests, Firebase Hosting provides HTTPS, and input validation rejects unsafe or invalid payment data. The project prioritizes security understanding over complex UI.
+For the final submission, record a short demo video with OBS and upload it as an unlisted YouTube video. The video should show:
+
+- The deployed HTTPS portal.
+- No public registration process.
+- Login with a bank-created user.
+- Rejection of invalid payment input.
+- Successful simulated international payment submission.
+- Firestore payment storage and Firestore rules.
+- CircleCI pipeline execution.
+- SonarQube/SonarCloud hotspot and code-smell scan result.
+
+# 10. Short Summary
+
+Invest Int Bank is a secure customer international payments portal built with React and Firebase. Firebase Authentication protects bank-created user passwords and sessions, Firestore stores simulated payment requests, Firebase Hosting provides HTTPS, CircleCI runs SonarQube scanning, and input validation rejects unsafe or invalid payment data. The project prioritizes security understanding over complex UI.
 
 # Critical App Information
 
 # Main Features
 
-- Customer registration using Firebase Authentication.
-- Customer login using Firebase Authentication.
+- Login for bank-created users using Firebase Authentication.
+- No public registration process in the React app.
 - Protected dashboard for authenticated users.
 - In-memory authentication session so users are not automatically logged in from saved PC sessions.
 - Online/inactivity timer that warns after 10 minutes of no activity and logs the user out if they do not confirm within 60 seconds.
@@ -125,10 +154,10 @@ Invest Int Bank is a secure customer international payments portal built with Re
 - Payment validation for beneficiary name, country, currency, amount, IBAN, SWIFT/BIC, and reference.
 - Simulated payment request storage in Cloud Firestore.
 - Recent payment request log.
-- Optional login alert email after registration or login using EmailJS.
+- Optional login alert email after login using EmailJS.
 - Firebase Hosting HTTPS deployment.
 - Firestore security rules.
-- GitHub Actions CI pipeline.
+- CircleCI pipeline with SonarQube/SonarCloud scanning.
 
 # How the App Runs
 
@@ -192,7 +221,7 @@ This feature supports the banking security demonstration by showing that repeate
 
 The app supports optional login alert emails using **EmailJS**, which is a third-party service provider. EmailJS is convenient for a demo because it can send directly from the frontend and its free plan is enough for a small number of demonstration emails.
 
-When the feature is configured, a member receives an email after registration or login. The alert email can include the login time, browser/device information, and timezone. The app does not track exact physical location because that would require extra browser permission or an IP location service and may create privacy and reliability issues.
+When the feature is configured, a member receives an email after login. The alert email can include the login time, browser/device information, and timezone. The app does not track exact physical location because that would require extra browser permission or an IP location service and may create privacy and reliability issues.
 
 To enable this feature, create an EmailJS account, connect an email service, create a template, and add these values to `.env`:
 
@@ -217,15 +246,15 @@ If these EmailJS values are left blank, the app skips login alert emails and con
 
 This project uses trusted third-party service providers instead of custom insecure code for security-critical features:
 
-- **Firebase Authentication**: handles registration, login, password hashing, salting, session security, and abuse protection.
+- **Firebase Authentication**: handles bank-created user login, password hashing, salting, session security, and abuse protection.
 - **Cloud Firestore**: stores customer profile data and simulated payment requests in a managed NoSQL document database.
 - **Firebase Hosting**: hosts the app over HTTPS so traffic is encrypted in transit.
 - **EmailJS**: optional provider for login alert emails. It is only used if the EmailJS environment variables are configured.
-- **GitHub Actions**: runs automated CI checks on code push.
+- **CircleCI**: runs automated build, dependency audit, and SonarQube/SonarCloud checks on code push.
 
 # Firebase Services Used
 
-- **Firebase Authentication** for user registration, login, password security, and sessions.
+- **Firebase Authentication** for bank-created user login, password security, and sessions.
 - **Cloud Firestore** as the NoSQL document database for customer profiles and payment requests.
 - **Firebase Hosting** for secure HTTPS hosting.
 

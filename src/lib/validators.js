@@ -1,7 +1,5 @@
 const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const nameRegex = /^[A-Za-z][A-Za-z\s'-]{1,59}$/;
-const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,64}$/;
 const amountRegex = /^(?:0|[1-9]\d{0,6})(?:\.\d{1,2})?$/;
 const ibanRegex = /^[A-Z0-9]{15,34}$/;
 const swiftRegex = /^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$/;
@@ -10,30 +8,6 @@ const countryRegex = /^[A-Za-z\s-]{2,56}$/;
 
 export function normalizeIban(value) {
   return value.replace(/\s+/g, "").toUpperCase();
-}
-
-export function validateRegistration(values) {
-  const errors = {};
-
-  if (!nameRegex.test(values.fullName.trim())) {
-    errors.fullName =
-      "Enter 2 to 60 letters only. Spaces, apostrophes, and hyphens are allowed.";
-  }
-
-  if (!emailRegex.test(values.email.trim())) {
-    errors.email = "Enter a valid email address.";
-  }
-
-  if (!passwordRegex.test(values.password)) {
-    errors.password =
-      "Use 12+ characters with upper, lower, number, and symbol.";
-  }
-
-  if (values.password !== values.confirmPassword) {
-    errors.confirmPassword = "Passwords do not match.";
-  }
-
-  return errors;
 }
 
 export function validateLogin(values) {

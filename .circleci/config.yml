@@ -1,0 +1,36 @@
+version: 2.1
+
+jobs:
+  build-and-scan:
+    docker:
+      - image: cimg/node:20.19
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - npm-cache-v1-{{ checksum "package-lock.json" }}
+            - npm-cache-v1-
+      - run:
+          name: Install dependencies
+          command: npm ci
+      - save_cache:
+          key: npm-cache-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - ~/.npm
+      - run:
+          name: Build React application
+          command: npm run build
+      - run:
+          name: Audit production dependencies
+          command: npm audit --audit-level=high --omit=dev
+      - run:
+          name: Run SonarQube scan
+          command: >
+            npx --yes sonarqube-scanner
+            -Dsonar.host.url="${SONAR_HOST_URL}"
+            -Dsonar.token="${SONAR_TOKEN}"
+
+workflows:
+  security-analysis:
+    jobs:
+      - build-and-scan
